@@ -39,6 +39,10 @@
 #include <shared_core/system/PosixSystem.hpp>
 #include <shared_core/system/SyslogDestination.hpp>
 
+#ifdef __OpenBSD__
+#include <sys/sysctl.h>
+#endif
+
 #ifdef __APPLE__
 #include <gsl/gsl-lite.hpp>
 #include <libproc.h>
@@ -1218,9 +1222,50 @@ Error executablePath(const char * argv0,
    // need to also search the PATH for the exe name in argv[0]
    //
 
+#ifdef __OpenBSD__
+   // OpenBSD has no /proc/self/exe. If argv0 wasn't supplied, obtain argv[0]
+   // for the current process via KERN_PROC_ARGS.
+   std::string openBsdArgv0;
+
+   if (argv0 == nullptr || *argv0 == '\0')
+   {
+      int mib[] = { CTL_KERN, KERN_PROC_ARGS, static_cast<int>(::getpid()),
+                    KERN_PROC_ARGV };
+
+      size_t size = 0;
+      if (::sysctl(mib, 4, nullptr, &size, nullptr, 0) == -1)
+         return systemError(errno, ERROR_LOCATION);
+
+      std::vector<char> buffer(size);
+      if (::sysctl(mib, 4, buffer.data(), &size, nullptr, 0) == -1)
+         return systemError(errno, ERROR_LOCATION);
+
+      char** procArgv = reinterpret_cast<char**>(buffer.data());
+      if (procArgv == nullptr || procArgv[0] == nullptr)
+         return systemError(EINVAL, ERROR_LOCATION);
+
+      openBsdArgv0 = procArgv[0];
+      argv0 = openBsdArgv0.c_str();
+   }
+
+   if (argv0[0] == '/')
+   {
+      executablePath = argv0;
+   }
+   else
+   {
+      char cwd[PATH_MAX];
+      if (::getcwd(cwd, sizeof(cwd)) == nullptr)
+         return systemError(errno, ERROR_LOCATION);
+
+      FilePath initialPath(cwd);
+      executablePath = initialPath.completePath(argv0).getAbsolutePath();
+   }
+#else
    // use argv[0] and initial path
    FilePath initialPath = FilePath::initialPath();
    executablePath = initialPath.completePath(argv0).getAbsolutePath();
+#endif
 
 #endif
 
@@ -1849,7 +1894,7 @@ void toPids(const std::vector<std::string>& lines, std::vector<PidType>* pPids)
 
 } // anonymous namespace
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__OpenBSD__)
 core::Error pidof(const std::string& process, std::vector<PidType>* pPids)
 {
    // use pidof to capture pids
@@ -2209,9 +2254,15 @@ Error ProcessInfo::creationTime(boost::posix_time::ptime* pCreationTime) const
    if (size == 0)
       return systemError(ESRCH, ERROR_LOCATION);
 
+#ifdef __OpenBSD__
+   double startSecs =
+      static_cast<double>(info.p_ustart_sec) +
+      static_cast<double>(info.p_ustart_usec) / 1000000.0;
+#else
    const struct timeval& start = info.kp_proc.p_starttime;
    double startSecs =
       static_cast<double>(start.tv_sec) + start.tv_usec / 1000000.0;
+#endif
    *pCreationTime = date_time::timeFromSecondsSinceEpoch(startSecs);
    return Success();
 }

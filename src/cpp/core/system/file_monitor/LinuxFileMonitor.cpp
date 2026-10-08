@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/types.h>
-#include <sys/inotify.h>
+#include <inotify/sys/inotify.h>
 
 #include <set>
 

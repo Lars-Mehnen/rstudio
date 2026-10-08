@@ -20,7 +20,7 @@
 #include <signal.h>
 #include <unistd.h>
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__OpenBSD__)
 #include <util.h>
 #include <sys/ttycom.h>
 #include <sys/ioctl.h>
@@ -828,7 +828,7 @@ Error ChildProcess::run()
 
       if (options_.exitWithParent)
       {
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__OpenBSD__)
          // set a bit indicating we want to die when our parent dies
          if (::prctl(PR_SET_PDEATHSIG, SIGTERM) == -1)
             LOG_ERROR(systemError(errno, ERROR_LOCATION));

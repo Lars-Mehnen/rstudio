@@ -297,12 +297,34 @@
         default resolve to ./www/js/panmirror, matching prior behavior. -->
    <property name="panmirror.build.dir" value="${www.dir}/js/panmirror"/>
 
-   <target name="panmirror" description="Compile panmirror library">
+   <!-- Detect OpenBSD for the native esbuild workaround. -->
+   <target name="detect-openbsd">
+      <condition property="is.openbsd">
+         <os name="OpenBSD"/>
+      </condition>
+   </target>
 
+   <!-- On other platforms preserve the normal dependency installation. -->
+   <target name="panmirror-install"
+           depends="detect-openbsd"
+           unless="is.openbsd">
+      <retry retrycount="3">
+         <exec executable="${yarn.bin}"
+               dir="${panmirror.dir}"
+               resolveexecutable="true"
+               failonerror="true">
+            <arg value="install"/>
+            <arg value="--network-timeout"/>
+            <arg value="240000"/>
+         </exec>
+      </retry>
+   </target>
+
+   <target name="panmirror-init">
       <!-- Make sure a default value for panmirror.minify is set -->
       <condition property="panmirror.minify" value="true">
          <not>
-            <isset property="panmirror.minify" />
+            <isset property="panmirror.minify"/>
          </not>
       </condition>
 
@@ -311,28 +333,59 @@
       <echo message="panmirror minify: ${panmirror.minify}"/>
 
       <mkdir dir="${panmirror.build.dir}"/>
-      <retry retrycount="3">
-         <exec executable="${yarn.bin}" dir="${panmirror.dir}" resolveexecutable="true" failonerror="true">
-            <arg value="install"/>
-            <arg value="--network-timeout"/>
-            <arg value="240000"/>
-         </exec>
-      </retry>
-      <!-- vite needs more than node's default heap (~2GB on CI runners) to
-           render the panmirror bundle + sourcemap since pinyin 4.x added
-           several MB of dictionary data (quarto-dev/quarto#1057). preserve
-           any caller-provided NODE_OPTIONS; node lets later flags win, so a
-           caller's own heap setting takes precedence over ours. -->
       <property name="env.NODE_OPTIONS" value=""/>
-      <exec executable="${yarn.bin}" dir="${panmirror.dir}" resolveexecutable="true" failonerror="true">
+   </target>
+
+   <!-- Normal panmirror build used on supported non-OpenBSD platforms. -->
+   <target name="panmirror-build-default"
+           depends="detect-openbsd,panmirror-install,panmirror-init"
+           unless="is.openbsd">
+      <exec executable="${yarn.bin}"
+            dir="${panmirror.dir}"
+            resolveexecutable="true"
+            failonerror="true">
          <arg value="build"/>
          <arg value="--minify"/>
          <arg value="${panmirror.minify}"/>
          <arg value="--sourcemap"/>
          <arg value="true"/>
          <env key="PANMIRROR_OUTDIR" value="dist-rstudio"/>
-         <env key="NODE_OPTIONS" value="--max-old-space-size=4096 ${env.NODE_OPTIONS}"/>
+         <env key="NODE_OPTIONS"
+              value="--max-old-space-size=4096 ${env.NODE_OPTIONS}"/>
       </exec>
+   </target>
+
+   <!--
+      OpenBSD:
+      node_modules are prepared by the OpenBSD build helper and esbuild
+      must use a native OpenBSD executable supplied through the environment.
+   -->
+   <target name="panmirror-build-openbsd"
+           depends="detect-openbsd,panmirror-init"
+           if="is.openbsd">
+      <fail unless="env.ESBUILD_BINARY_PATH"
+            message="ESBUILD_BINARY_PATH must point to a native OpenBSD esbuild binary"/>
+
+      <exec executable="${yarn.bin}"
+            dir="${panmirror.dir}"
+            resolveexecutable="true"
+            failonerror="true">
+         <arg value="build"/>
+         <arg value="--minify"/>
+         <arg value="${panmirror.minify}"/>
+         <arg value="--sourcemap"/>
+         <arg value="true"/>
+         <env key="PANMIRROR_OUTDIR" value="dist-rstudio"/>
+         <env key="ESBUILD_BINARY_PATH"
+              value="${env.ESBUILD_BINARY_PATH}"/>
+         <env key="NODE_OPTIONS"
+              value="--max-old-space-size=4096 ${env.NODE_OPTIONS}"/>
+      </exec>
+   </target>
+
+   <target name="panmirror"
+           depends="panmirror-build-default,panmirror-build-openbsd"
+           description="Compile panmirror library">
       <copy todir="${panmirror.build.dir}">
          <fileset dir="${panmirror.dir}/dist-rstudio"/>
       </copy>

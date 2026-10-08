@@ -51,7 +51,7 @@ UserIdentity currentUserIdentity()
    return userIdentity;
 }
 
-#if defined(HAVE_SO_PEERCRED)
+#if defined(HAVE_SO_PEERCRED) && !defined(__OpenBSD__)
 
 namespace {
 
@@ -96,7 +96,7 @@ Error socketPeerIdentity(int socket, UserIdentity* pIdentity)
    #error "No way to discover socket peer identity found on this platform"
 #endif
 
-#if defined(HAVE_SO_PEERCRED)
+#if defined(HAVE_SO_PEERCRED) && !defined(__OpenBSD__)
 
 Error socketPeerPid(int socket, pid_t* pPid)
 {

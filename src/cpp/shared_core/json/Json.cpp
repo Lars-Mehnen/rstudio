@@ -52,6 +52,12 @@ namespace rapidjson {
 typedef uint64_t SizeType;
 } // end namespace rapidjson
 
+#elif defined(__OpenBSD__)
+
+namespace rapidjson {
+typedef unsigned SizeType;
+} // end namespace rapidjson
+
 #else
 
 namespace rapidjson {

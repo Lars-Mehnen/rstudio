@@ -15,6 +15,15 @@
 
 #include "ChatTypes.hpp"
 
+#ifdef __OpenBSD__
+#ifdef major
+#undef major
+#endif
+#ifdef minor
+#undef minor
+#endif
+#endif
+
 #include <algorithm>
 #include <cctype>
 #include <vector>

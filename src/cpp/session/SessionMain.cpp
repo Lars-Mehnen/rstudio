@@ -2576,7 +2576,7 @@ RSESSION_MAIN_API int rsessionMain(int argc, char * const argv[])
 
       // move to own process group
 #ifndef _WIN32
-      ::setpgrp();
+      ::setpgid(0, 0);
 #endif
 
       logStartingEnv();

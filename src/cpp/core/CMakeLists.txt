@@ -214,6 +214,32 @@ if (UNIX)
       ${ACL_LIBRARIES}
       ${ZLIB_LIBRARIES})
 
+   if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+      find_library(PQ_LIBRARIES pq PATHS /usr/local/lib)
+      find_library(EXECINFO_LIBRARIES execinfo PATHS /usr/lib)
+      find_library(INOTIFY_LIBRARIES
+         NAMES inotify libinotify
+         PATHS /usr/local/lib/inotify
+         NO_DEFAULT_PATH)
+
+      if(NOT PQ_LIBRARIES)
+         message(FATAL_ERROR "OpenBSD libpq not found")
+      endif()
+
+      if(NOT EXECINFO_LIBRARIES)
+         message(FATAL_ERROR "OpenBSD libexecinfo not found")
+      endif()
+
+      if(NOT INOTIFY_LIBRARIES)
+         message(FATAL_ERROR "OpenBSD libinotify not found")
+      endif()
+
+      list(APPEND CORE_SYSTEM_LIBRARIES
+         ${PQ_LIBRARIES}
+         ${EXECINFO_LIBRARIES}
+         ${INOTIFY_LIBRARIES})
+   endif()
+
    # add Apple frameworks we depend on
    if(APPLE)
       list(APPEND CORE_SYSTEM_LIBRARIES ${CORE_FOUNDATION_LIBRARY})
@@ -264,6 +290,12 @@ if (UNIX)
          system/file_monitor/MacFileMonitor.cpp
          system/recycle_bin/MacRecycleBin.cpp
          system/MacResources.cpp
+      )
+   elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+      set(CORE_SOURCE_FILES ${CORE_SOURCE_FILES}
+         system/file_monitor/LinuxFileMonitor.cpp
+         system/recycle_bin/LinuxRecycleBin.cpp
+         system/OpenBSDResources.cpp
       )
    else()
       set(CORE_SOURCE_FILES ${CORE_SOURCE_FILES}

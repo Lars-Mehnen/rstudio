@@ -78,7 +78,13 @@ fi
 # untar source; removing an existing build directory if one exists
 subsection "Extracting Boost"
 rm -rf "${BOOST_FOLDER}"
-tar --bzip2 -xf "${BOOST_TARBALL}"
+
+if [ "$(uname -s)" = "OpenBSD" ]; then
+   gtar --bzip2 -xf "${BOOST_TARBALL}"
+else
+   tar --bzip2 -xf "${BOOST_TARBALL}"
+fi
+
 cd "${BOOST_FOLDER}"
 
 # use 'rstudio_boost' namespace instead of 'boost'
