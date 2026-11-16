@@ -497,6 +497,25 @@ if(EXISTS "${_LIBGIT2_GIT2_H}.prev")
    endif()
 endif()
 
+# OpenBSD: fmt/base.h uses malloc/free but omits <stdlib.h>, causing build
+# failures with Clang. Patch the vendored header after FetchContent populates it.
+if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD" AND DEFINED FMT_SOURCE_DIR)
+   set(_FMT_BASE_H "${FMT_SOURCE_DIR}/include/fmt/base.h")
+   if(EXISTS "${_FMT_BASE_H}")
+      file(READ "${_FMT_BASE_H}" _FMT_BASE_H_CONTENT)
+      if(NOT _FMT_BASE_H_CONTENT MATCHES "#include <stdlib\\.h>")
+         string(REPLACE
+            "#  include <stdio.h>   // FILE"
+            "#  include <stdio.h>   // FILE\n#  include <stdlib.h>  // malloc, free"
+            _FMT_BASE_H_CONTENT "${_FMT_BASE_H_CONTENT}")
+         file(WRITE "${_FMT_BASE_H}" "${_FMT_BASE_H_CONTENT}")
+         message(STATUS "OpenBSD: patched fmt/base.h to add <stdlib.h>")
+      endif()
+      unset(_FMT_BASE_H_CONTENT)
+   endif()
+   unset(_FMT_BASE_H)
+endif()
+
 restore_global_settings()
 
 
